@@ -1,0 +1,18 @@
+{
+      "READ_THIS": "MTUzMDQ5NjU1MzU3NDMzNDU2NA.G7d88K.moSHHs6d9GQaeN1xdlN4l7j0ap9tNjb4nHYVP8 ",
+      "prefix": "0.",
+      "host": "http://localhost/dbgdps",
+      "owner": "1511621521641050234 ",
+      "statusbot": "online",
+      "actionbot": "PLAYING",
+      "gdpsup": {
+            "READ_THIS": "change gdps, directory and turn if needed. turn is if you are using gdps song uploader use On",
+            "gdps": true,
+            "directory": "gdpsup",
+            "turn": "Off"
+      },
+      "channel": {
+      "gdpsstatus": "channel_id",
+      "ratestatus": "channel_id"
+      }
+}

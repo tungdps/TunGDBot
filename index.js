@@ -8,7 +8,6 @@ const { Client, GatewayIntentBits, Partials, Collection, ChannelType, ActivityTy
 const fs = require("fs");
 const req = require("request");
 
-// Cấu hình Intents chuẩn v14 để fix lỗi ClientMissingIntents
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -17,7 +16,7 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers
     ],
-    partials: [Partials.Channel, Partials.Message] // Cho phép bot nhận tin nhắn DM
+    partials: [Partials.Channel, Partials.Message]
 });
 
 client.commands = new Collection();
@@ -32,7 +31,6 @@ function pass_session(id, pass, timexpire = 30) {
     }, timexpire * 1000);
 }
 
-// Main function for gauntlets
 async function setupG(uri, keycard) {
     req.get(`${uri}/bot/api/gauntlets.php?doing=1&keycard=${keycard}`, (err, res, body) => {
         if (body == '-1') return;
@@ -61,7 +59,6 @@ client.on("ready", async () => {
     }
     console.log("Login as " + client.user.username);
     
-    // Sửa setPresence chuẩn v14
     client.user.setPresence({
         activities: [{
             name: `GDPS | ${M.prefix}help`,
@@ -83,7 +80,6 @@ client.on("ready", async () => {
     }
 });
 
-// Sửa sự kiện 'message' -> 'messageCreate' chuẩn v14
 client.on('messageCreate', async msg => {
     if (msg.author.bot) return;
 
@@ -93,7 +89,6 @@ client.on('messageCreate', async msg => {
 
     if (!command.startsWith(M.prefix)) return;
 
-    // Sửa kiểm tra ChannelType chuẩn v14
     if (msg.channel.type === ChannelType.GuildText) {
         let cmd = client.commands.get(command.slice(M.prefix.length));
         if (cmd) cmd.run(client, msg, args);
@@ -140,6 +135,71 @@ client.on('messageCreate', async msg => {
                 let idsgau = '';
                 let type = [false, "Fire", "Ice", "Poison", "Shadow", "Lava", "Bonus", "Chaos", "Demon", "Time", "Crystal", "Magic", "Spike", "Monster", "Doom", "Death"];
                 type.slice(1).forEach((str, index) => {
+                    idsgau += `${index + 1} = ${str}\n`;
+                });
+                if (!args[1]) return msg.channel.send('```' + idsgau + '```\nExample: `' + M.prefix + 'gauntlet ' + args[0] + ' <gauntlet id> <lvls>(1,2,3,4,5)`');
+                if (!type[args[1]]) return msg.channel.send('Invalid ID');
+                query += 'doing=3&';
+                gaurun = true;
+                query += `keycard=${keycard.get(msg.author.id) || "0"}&`;
+                query += `gauntid=${args[1]}&`;
+                lvls = args[2] ? args[2].split(',') : [];
+                query += `l1=${lvls[0] || ''}&`;
+                query += `l2=${lvls[1] || ''}&`;
+                query += `l3=${lvls[2] || ''}&`;
+                query += `l4=${lvls[3] || ''}&`;
+                query += `l5=${lvls[4] || ''}`;
+            } else if (args[0] == 'forgotpass') {
+                return msg.channel.send('forgot password? please delete verify files at ' + `||${M.host}/bot/api/verify||\n and setup`);
+            } else if (args[0] == 'changepass') {
+                if (!args[1]) return msg.channel.send('Input password (`space` are not needed)');
+                gaurun = true;
+                query += 'doing=5&';
+                query += `keycard=${keycard.get(msg.author.id) || "0"}&`;
+                query += `keycard1=${args[1]}`;
+            } else if (args[0] == 'update') {
+                let idsgau = '';
+                let type = [false, "Fire", "Ice", "Poison", "Shadow", "Lava", "Bonus", "Chaos", "Demon", "Time", "Crystal", "Magic", "Spike", "Monster", "Doom", "Death"];
+                type.slice(1).forEach((str, index) => {
+                    idsgau += `${index + 1} = ${str}\n`;
+                });
+                if (!args[1]) return msg.channel.send('```' + idsgau + '```\nExample: `' + M.prefix + 'gauntlet ' + args[0] + ' <gauntlet id> <level1=id,level5=id>`');
+                if (!type[args[1]]) return msg.channel.send('Invalid ID');
+                query += 'doing=4&';
+                query += `gauntid=${args[1]}&`;
+                query += `query=${args[2]}&`;
+                query += `keycard=${keycard.get(msg.author.id) || "0"}`;
+            } else if (args[0] == 'show') {
+                query += 'doing=2&';
+            } else if (args[0] == 'login') {
+                if (args[1] == 'help') return msg.channel.send(`Example:\` ${M.prefix}gauntlet login <password> <time session in seconds: Optional>\``);
+                pass_session(msg.author.id, args[1], args[2] || 30);
+                console.log(keycard);
+                return msg.channel.send('Login session ready');
+            } else {
+                let helpgau = '__**HELP SECTIONS**__\n';
+                helpgau += 'use this command with gauntlet cmd\n`add,setup,login,<allcmd> help`';
+                helpgau += '\nExample: `' + M.prefix + 'gauntlet add help`';
+                return msg.channel.send(helpgau);
+            }
+
+            if (!keycard.has(msg.author.id)) return msg.channel.send('Your session login is end or not ready, please login with `' + `${M.prefix}gauntlet login <password>\``);
+            if (!gaurun) return;
+            req.get(`${M.host}/bot/api/gauntlets.php?${query}`, (err, res, body) => {
+                console.log(body);
+                if (body == '-1') return msg.channel.send("INFO: Setup is not ready, use this command for setup `" + `${M.prefix}gauntlet setup\``);
+                if (body == '-2') return msg.channel.send("INFO: You are not allowed to use it (Invalid)");
+                if (body == '-3') return msg.channel.send("INFO: Added success");
+                if (body == '-4') return msg.channel.send("INFO: Updated success");
+                if (body == '-5') return msg.channel.send("INFO: Not exists");
+                if (body == '-6') return msg.channel.send("INFO: Already exists");
+                if (body == '-7') return msg.channel.send("INFO: success change password");
+            });
+        } else if (commandDM == 'ping') return msg.channel.send('Pong!');
+    }
+});
+
+client.login(process.env.BOT_TOKEN || process.env.DISCORD_TOKEN);
                     idsgau += `${index + 1} = ${str}\n`;
                 });
                 if (!args[1]) return msg.channel.send('```' + idsgau + '```\nExample: `' + M.prefix + 'gauntlet ' + args[0] + ' <gauntlet id> <lvls>(1,2,3,4,5)`');

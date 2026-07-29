@@ -2,11 +2,19 @@ const { EmbedBuilder } = require("discord.js");
 const axios = require("axios");
 const M = require("../setup.json");
 
-module.run = async (client, msg, args) => {
+module.exports.run = async (client, msg, args) => {
     let songLink = args[0];
 
+    // Lấy link file MP3 đính kèm trong tin nhắn nếu người dùng gửi file trực tiếp
+    if (msg.attachments.size > 0) {
+        let attachment = msg.attachments.first();
+        if (attachment.url) {
+            songLink = attachment.url;
+        }
+    }
+
     if (!songLink) {
-        return msg.channel.send(`Cách dùng: \`${M.prefix}songAdd <link-nhạc-hoặc-mp3>\``);
+        return msg.channel.send(`Cách dùng: \`${M.prefix}songAdd <link-mp3>\` hoặc đính kèm file MP3 vào tin nhắn!`);
     }
 
     let host = M.host.endsWith('/') ? M.host.slice(0, -1) : M.host;
@@ -35,7 +43,7 @@ module.run = async (client, msg, args) => {
                 { name: "Tên Bài Hát", value: String(body.name), inline: true },
                 { name: "Tác Giả", value: String(body.author), inline: true }
             )
-            .setFooter({ text: "Sao chép ID Song trên và dán vào Geometry Dash để sử dụng!" });
+            .setFooter({ text: "Sao chép ID Song ở trên và dán vào Geometry Dash!" });
 
         return msg.channel.send({ embeds: [embed] });
 

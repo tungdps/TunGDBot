@@ -1,27 +1,50 @@
-const Discord = require("discord.js");
-const req = require("request-promise");
-const fetch = require("snekfetch");
-const config = require("../setup.json");
+const { EmbedBuilder } = require("discord.js");
+const axios = require("axios");
+const M = require("../setup.json");
 
-module.exports.run = async (client, msg, args) => {
-	let url = args[0];
-	if (!args[0]) return msg.channel.send("url soundcloud only");
-	let key = "dc467dd431fc48eb0244b0aead929ccd";
-	let json = await req({uri: `https://api.soundcloud.com/resolve?url=${url}&client_id=${key}`, method: "GET", json: true});
-	//console.log(json);
-	if (json["errors"]) return msg.channel.send(json["errors"]);
-	let link = `${json["stream_url"]}?client_id=${key}`;
-	req({
-		uri: config.host + "/bot/api/songAdd.php?" + `link=${link}&name=${json["title"]}&author=${json["user"]["username"]}`,
-		method: "GET"
-		}).then (result => {
-			msg.channel.send(`**Song added in**: ${result}`);
-			}).catch(err => {
-				console.log(err);
-				if (err) return msg.channel.send("something when wrong");
-				});
-	}
-	
+module.run = async (client, msg, args) => {
+    let songLink = args[0];
+
+    if (!songLink) {
+        return msg.channel.send(`Cách dùng: \`${M.prefix}songAdd <link-nhạc-hoặc-mp3>\``);
+    }
+
+    let host = M.host.endsWith('/') ? M.host.slice(0, -1) : M.host;
+    let apiUrl = `${host}/bot/api/songAdd.php?url=${encodeURIComponent(songLink)}`;
+
+    try {
+        let res = await axios.get(apiUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+            timeout: 10000
+        });
+
+        let body = res.data;
+        if (typeof body === 'string') {
+            try { body = JSON.parse(body); } catch(e) {}
+        }
+
+        if (!body || body.error) {
+            return msg.channel.send("❌ Không thể thêm bài hát! Lỗi: " + (body ? body.error : "Không có phản hồi từ Web"));
+        }
+
+        let embed = new EmbedBuilder()
+            .setTitle(body.exists ? "🎵 Bài hát đã tồn tại!" : "✅ Thêm bài hát thành công!")
+            .setColor(body.exists ? "#FFA500" : "#00FF00")
+            .addFields(
+                { name: "ID Song (Dùng trong game)", value: `\`${body.id}\``, inline: true },
+                { name: "Tên Bài Hát", value: String(body.name), inline: true },
+                { name: "Tác Giả", value: String(body.author), inline: true }
+            )
+            .setFooter({ text: "Sao chép ID Song trên và dán vào Geometry Dash để sử dụng!" });
+
+        return msg.channel.send({ embeds: [embed] });
+
+    } catch (err) {
+        console.error("Lỗi songAdd API:", err.message);
+        return msg.channel.send("❌ Không thể kết nối đến Web GDPS để thêm bài hát!");
+    }
+};
+
 module.exports.help = {
-	name: "songAdd"
-	}
+    name: "songadd"
+};

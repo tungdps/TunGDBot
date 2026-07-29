@@ -7,7 +7,7 @@ module.exports.run = async (client, msg, args) => {
     let page = args[1];
     let type = args[0];
     
-    if (!type) return msg.channel.send("Try this command `" + M.prefix + "leaderboard` `stars` `1``);
+    if (!type) return msg.channel.send("Try this command `" + M.prefix + "leaderboard stars 1`");
     if (page && isNaN(page)) return msg.channel.send("Please enter a number, not letters");
     
     let fetchhost = page ? `${http}?in=${type}&page=${page}` : `${http}?in=${type}`;
@@ -22,7 +22,7 @@ module.exports.run = async (client, msg, args) => {
         let embed = new EmbedBuilder()
             .setTitle("Leaderboards of " + body.type)
             .addFields(
-                { name: "Top " + body.topTo, value: body.top },
+                { name: "Top " + body.topTo, value: String(body.top) },
                 { name: "__For Next Page__", value: "`" + M.prefix + "leaderboard " + type + " <page-num>`" }
             )
             .setFooter({ text: "Now Page = " + body.page });

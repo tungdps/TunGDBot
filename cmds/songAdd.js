@@ -5,8 +5,8 @@ const M = require("../setup.json");
 module.exports.run = async (client, msg, args) => {
     let songLink = args[0];
 
-    // Lấy link file MP3 đính kèm trong tin nhắn nếu người dùng gửi file trực tiếp
-    if (msg.attachments.size > 0) {
+    // Tự động nhận diện file âm thanh/nhạc đính kèm trong tin nhắn Discord
+    if (msg.attachments && msg.attachments.size > 0) {
         let attachment = msg.attachments.first();
         if (attachment.url) {
             songLink = attachment.url;
@@ -14,7 +14,7 @@ module.exports.run = async (client, msg, args) => {
     }
 
     if (!songLink) {
-        return msg.channel.send(`Cách dùng: \`${M.prefix}songAdd <link-mp3>\` hoặc đính kèm file MP3 vào tin nhắn!`);
+        return msg.channel.send(`Cách dùng: \`${M.prefix}songAdd <link-mp3>\` hoặc đính kèm file MP3 trực tiếp!`);
     }
 
     let host = M.host.endsWith('/') ? M.host.slice(0, -1) : M.host;
@@ -32,18 +32,18 @@ module.exports.run = async (client, msg, args) => {
         }
 
         if (!body || body.error) {
-            return msg.channel.send("❌ Không thể thêm bài hát! Lỗi: " + (body ? body.error : "Không có phản hồi từ Web"));
+            return msg.channel.send("❌ Không thể thêm bài hát! Lỗi: " + (body ? body.error : "Không nhận được dữ liệu từ Web GDPS"));
         }
 
         let embed = new EmbedBuilder()
-            .setTitle(body.exists ? "🎵 Bài hát đã tồn tại!" : "✅ Thêm bài hát thành công!")
+            .setTitle(body.exists ? "🎵 Bài hát đã có trên máy chủ!" : "✅ Thêm bài hát thành công!")
             .setColor(body.exists ? "#FFA500" : "#00FF00")
             .addFields(
-                { name: "ID Song (Dùng trong game)", value: `\`${body.id}\``, inline: true },
+                { name: "ID Song (Nhập vào GDPS)", value: `\`${body.id}\``, inline: true },
                 { name: "Tên Bài Hát", value: String(body.name), inline: true },
                 { name: "Tác Giả", value: String(body.author), inline: true }
             )
-            .setFooter({ text: "Sao chép ID Song ở trên và dán vào Geometry Dash!" });
+            .setFooter({ text: "Hãy sao chép ID trên và dán vào Geometry Dash!" });
 
         return msg.channel.send({ embeds: [embed] });
 

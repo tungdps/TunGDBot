@@ -1,25 +1,17 @@
-const Discord = require ("discord.js");
-const fetch = require ("snekfetch");
-const M = require ("../setup.json");
+const { SlashCommandBuilder } = require('discord.js');
 
-module.exports.run = async (client, msg, args) => {
-	let sms = await msg.channel.send ("Searching, Please wait");
-	fetch.get (`${M.host}` + '/bot/api/song.php').then ( s => {
-		let body = s.body;
-		let id = args[0];
-		sms.delete ();
-		let entry = body.find (post => post.id === id) || body.find (post => post.name === id);
-		if (!id) return msg.channel.send ("Give me the `Song ID` or `Song Name`");
-		if (!entry) return msg.channel.send ("This song is not exist");
+module.exports = {
+    data: new SlashCommandBuilder()
+        .setName('song')
+        .setDescription('Get info/download song by ID')
+        .addIntegerOption(option => 
+            option.setName('id')
+                .setDescription('The Song ID in GDPS')
+                .setRequired(true)
+        ),
 
-		let embed = new Discord.MessageEmbed ()
-		.setTitle("Information Song")
-		.setDescription ("ID Song: **" + entry.id + "**\n" + "Name: **" + entry.name + "**\n" + "Size: **" + entry.size + "**\n" + entry.download )
-		.addField ("Stats Of Song" , "This song is **" + entry.Info + "**" )
-		msg.channel.send ({ embed : embed});
-	});
-}
-	
-module.exports.help = {
-	name: "song"
-}
+    async execute(interaction) {
+        const songId = interaction.options.getInteger('id');
+        await interaction.reply({ content: `🎵 Song info for ID: **${songId}**` });
+    }
+};

@@ -1,326 +1,58 @@
-require("dotenv/config");
-const bot = require("./bot");
-const M = require("./setup.json");
-const app = require("express")();
-const status = M.statusbot;
-const action = M.actionbot;
-const { 
-    Client, 
-    GatewayIntentBits, 
-    Partials, 
-    Collection, 
-    ChannelType, 
-    ActivityType, 
-    REST, 
-    Routes, 
-    SlashCommandBuilder 
-} = require("discord.js");
-const fs = require("fs");
-const req = require("request");
+const fs = require('fs');
+const path = require('path');
+const { Client, GatewayIntentBits, Collection } = require('discord.js');
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.DirectMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
-    ],
-    partials: [Partials.Channel, Partials.Message]
+    ]
 });
 
 client.commands = new Collection();
-const keycard = new Collection();
-const typefiles = "js";
 
-function pass_session(id, pass, timexpire = 30) {
-    keycard.set(id, pass);
-    setTimeout(() => {
-        keycard.delete(id);
-        console.log(keycard);
-    }, timexpire * 1000);
-}
+// Load tất cả các lệnh Slash từ thư mục cmds
+const commandsPath = path.join(__dirname, 'cmds');
+if (fs.existsSync(commandsPath)) {
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js') && file !== 'deploy-commands.js');
 
-async function setupG(uri, keycard) {
-    req.get(`${uri}/bot/api/gauntlets.php?doing=1&keycard=${keycard}`, (err, res, body) => {
-        if (body == '-1') return;
-    });
-}
-
-app.get("/", (req, res) => {
-    res.send("OK");
-    res.end();
-});
-
-// Tải các lệnh từ thư mục ./cmds/
-fs.readdir("./cmds/", (err, files) => {
-    if (err) return console.error(err);
-    let jsfiles = files.filter(f => f.split(".").pop() === typefiles);
-    if (jsfiles.length <= 0) return;
-    jsfiles.forEach((f) => {
-        let props = require(`./cmds/${f}`);
-        if (props.help && props.help.name) {
-            client.commands.set(props.help.name.toLowerCase(), props);
-        }
-    });
-});
-
-client.on("ready", async () => {
-    console.clear();
-    if (process.argv[2] == "ide-mode") {
-        app.listen(process.env.PORT || process.env.SERVER_PORT || 8080);
-    }
-    console.log("Login as " + client.user.username);
-    
-    client.user.setPresence({
-        activities: [{
-            name: `GDPS | ${M.prefix}help`,
-            type: ActivityType.Playing
-        }],
-        status: status || 'online'
-    });
-
-    if (!isNaN(M["channel"]["gdpsstatus"])) bot.gdpsstatus(client, M);
-    if (!isNaN(M["channel"]["ratestatus"])) bot.ratenotif(client, M);
-
-    if (process.env.GENERATE_INVITE_BOT == "true") {
+    for (const file of commandFiles) {
+        const filePath = path.join(commandsPath, file);
         try {
-            let link = await client.generateInvite({ 
-                scopes: ['bot', 'applications.commands'], 
-                permissions: ["Administrator"] 
-            });
-            console.log("Invite me: " + link);
-        } catch (err) {
-            console.log(err.stack);
+            const command = require(filePath);
+            if (command && 'data' in command && 'execute' in command) {
+                client.commands.set(command.data.name, command);
+            }
+        } catch (e) {
+            console.error(`Lỗi nạp file ${file}:`, e);
         }
     }
+}
 
-    // --- ĐĂNG KÝ DANH SÁCH LỆNH SLASH COMMAND (/) VỚI DISCORD API ---
-    const slashCommands = [
-        new SlashCommandBuilder()
-            .setName('level')
-            .setDescription('Tra cứu thông tin Level trên GDPS')
-            .addIntegerOption(option => 
-                option.setName('id')
-                    .setDescription('Nhập Level ID')
-                    .setRequired(true)),
-
-        new SlashCommandBuilder()
-            .setName('leaderboard')
-            .setDescription('Xem Bảng xếp hạng GDPS')
-            .addStringOption(option =>
-                option.setName('type')
-                    .setDescription('Loại xếp hạng (stars/demons)')
-                    .setRequired(false))
-            .addIntegerOption(option =>
-                option.setName('page')
-                    .setDescription('Số trang')
-                    .setRequired(false)),
-
-        new SlashCommandBuilder()
-            .setName('dailylevel')
-            .setDescription('Xem thông tin Daily Level hiện tại'),
-
-        new SlashCommandBuilder()
-            .setName('songadd')
-            .setDescription('Thêm bài hát mới vào GDPS')
-            .addStringOption(option =>
-                option.setName('url')
-                    .setDescription('Link bài hát .mp3')
-                    .setRequired(false)),
-
-        new SlashCommandBuilder()
-            .setName('ping')
-            .setDescription('Kiểm tra độ phản hồi của Bot')
-    ];
-
-    try {
-        const token = process.env.BOT_TOKEN || process.env.DISCORD_TOKEN || M.token;
-        if (token) {
-            const rest = new REST({ version: '10' }).setToken(token);
-            console.log('Đang đăng ký lệnh Slash Commands (/)...');
-            await rest.put(
-                Routes.applicationCommands(client.user.id),
-                { body: slashCommands }
-            );
-            console.log('✅ Đã đăng ký thành công Slash Commands (/)!');
-        }
-    } catch (error) {
-        console.error('Lỗi khi đăng ký Slash Command:', error);
-    }
+client.once('ready', () => {
+    console.log(`✅ Bot đã online: ${client.user.tag}`);
 });
 
-// --- XỬ LÝ KHI NGƯỜI DÙNG DÙNG LỆNH GẠCH CHÉO (SLASH COMMANDS) ---
+// LẮNG NGHE LỆNH SLASH (Bắt buộc phải có đoạn này)
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    // Phản hồi tạm thời ngay lập tức để không dính lỗi 3s Timeout của Discord
-    await interaction.deferReply();
-
-    const commandName = interaction.commandName.toLowerCase();
-    const cmd = client.commands.get(commandName);
-
-    if (!cmd) {
-        return interaction.editReply("❌ Lệnh này hiện không khả dụng!");
-    }
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
 
     try {
-        let fakeArgs = [];
-
-        // Trích xuất tham số dựa theo lệnh
-        if (commandName === 'level') {
-            fakeArgs = [String(interaction.options.getInteger('id'))];
-        } else if (commandName === 'leaderboard') {
-            let type = interaction.options.getString('type') || 'stars';
-            let page = interaction.options.getInteger('page') || 1;
-            fakeArgs = [type, String(page)];
-        } else if (commandName === 'songadd') {
-            let url = interaction.options.getString('url') || '';
-            fakeArgs = [url];
+        await command.execute(interaction);
+    } catch (error) {
+        console.error('Lỗi khi chạy lệnh:', error);
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: '❌ Có lỗi xảy ra khi thực hiện lệnh!', ephemeral: true });
+        } else {
+            await interaction.reply({ content: '❌ Có lỗi xảy ra khi thực hiện lệnh!', ephemeral: true });
         }
-
-        // Tạo giả lập đối tượng Message tương thích với file trong ./cmds/
-        const fakeMsg = {
-            author: interaction.user,
-            attachments: new Collection(),
-            channel: {
-                send: async (content) => {
-                    if (typeof content === 'object') {
-                        return await interaction.editReply(content);
-                    } else {
-                        return await interaction.editReply({ content: content });
-                    }
-                }
-            }
-        };
-
-        // Chạy file command tương ứng
-        await cmd.run(client, fakeMsg, fakeArgs);
-
-    } catch (err) {
-        console.error("Lỗi khi chạy Slash Command:", err);
-        return interaction.editReply("❌ Có lỗi xảy ra khi thực hiện lệnh!");
     }
 });
 
-// --- XỬ LÝ KHI NGƯỜI DÙNG DÙNG LỆNH PREFIX CŨ (0.level, 0.help,...) ---
-client.on('messageCreate', async msg => {
-    if (msg.author.bot) return;
-
-    let msgArray = msg.content.split(" ");
-    let command = msgArray[0];
-    let args = msgArray.slice(1);
-
-    if (!command.startsWith(M.prefix)) return;
-
-    if (msg.channel.type === ChannelType.GuildText) {
-        let cmd = client.commands.get(command.slice(M.prefix.length).toLowerCase());
-        if (cmd) cmd.run(client, msg, args);
-    } else if (msg.channel.type === ChannelType.DM) {
-        let commandDM = command.slice(M.prefix.length);
-        if (commandDM == 'upload') {
-            let a024 = '.';
-            if (msg.author.id == M.owner) a024 = ', please edit in setup.json and restart the bot';
-            if (M.gdpsup.turn == "Off") return msg.channel.send(`This command has been blocked${a024}`);
-            let uri = M.host + `/${M.gdpsup.directory}/`;
-            if (!M.gdpsup.gdps) uri = M.gdpsup.directory;
-            let attach = msg.attachments;
-            if (!attach.first()) return msg.channel.send("No file attached!");
-            let url = attach.first().url;
-            let spliter = url.split('.');
-            let slash = url.split('/');
-            let filetype = spliter[spliter.length - 1];
-            let title = slash[slash.length - 1].slice(0, 1 - (filetype.length + 2));
-
-            let requesting = {
-                title: title,
-                discord: process.env.GDPS_KEY,
-                url: url,
-                filetype: filetype,
-                size: attach.first().size
-            };
-            req.post(uri + 'stuff.php', {
-                form: requesting
-            }, (err, res, body) => {
-                if (err || !res || res.statusCode !== 200) return msg.channel.send('Error: script not found/installed');
-                return msg.channel.send(body);
-            });
-        } else if (commandDM == 'gauntlet') {
-            let query = '';
-            let lvls = '';
-            let gaurun = false;
-
-            if (args[0] == 'setup') {
-                if (!args[1]) return msg.channel.send('Input password (`space` are not needed)');
-                gaurun = true;
-                query += `doing=1`;
-                query += `&keycard=${msg.author.id}`;
-            } else if (args[0] == 'add') {
-                let idsgau = '';
-                let type = [false, "Fire", "Ice", "Poison", "Shadow", "Lava", "Bonus", "Chaos", "Demon", "Time", "Crystal", "Magic", "Spike", "Monster", "Doom", "Death"];
-                type.slice(1).forEach((str, index) => {
-                    idsgau += `${index + 1} = ${str}\n`;
-                });
-                if (!args[1]) return msg.channel.send('```' + idsgau + '```\nExample: `' + M.prefix + 'gauntlet ' + args[0] + ' <gauntlet id> <lvls>(1,2,3,4,5)`');
-                if (!type[args[1]]) return msg.channel.send('Invalid ID');
-                query += 'doing=3&';
-                gaurun = true;
-                query += `keycard=${keycard.get(msg.author.id) || "0"}&`;
-                query += `gauntid=${args[1]}&`;
-                lvls = args[2] ? args[2].split(',') : [];
-                query += `l1=${lvls[0] || ''}&`;
-                query += `l2=${lvls[1] || ''}&`;
-                query += `l3=${lvls[2] || ''}&`;
-                query += `l4=${lvls[3] || ''}&`;
-                query += `l5=${lvls[4] || ''}`;
-            } else if (args[0] == 'forgotpass') {
-                return msg.channel.send('forgot password? please delete verify files at ' + `||${M.host}/bot/api/verify||\n and setup`);
-            } else if (args[0] == 'changepass') {
-                if (!args[1]) return msg.channel.send('Input password (`space` are not needed)');
-                gaurun = true;
-                query += 'doing=5&';
-                query += `keycard=${keycard.get(msg.author.id) || "0"}&`;
-                query += `keycard1=${args[1]}`;
-            } else if (args[0] == 'update') {
-                let idsgau = '';
-                let type = [false, "Fire", "Ice", "Poison", "Shadow", "Lava", "Bonus", "Chaos", "Demon", "Time", "Crystal", "Magic", "Spike", "Monster", "Doom", "Death"];
-                type.slice(1).forEach((str, index) => {
-                    idsgau += `${index + 1} = ${str}\n`;
-                });
-                if (!args[1]) return msg.channel.send('```' + idsgau + '```\nExample: `' + M.prefix + 'gauntlet ' + args[0] + ' <gauntlet id> <level1=id,level5=id>`');
-                if (!type[args[1]]) return msg.channel.send('Invalid ID');
-                query += 'doing=4&';
-                query += `gauntid=${args[1]}&`;
-                query += `query=${args[2]}&`;
-                query += `keycard=${keycard.get(msg.author.id) || "0"}`;
-            } else if (args[0] == 'show') {
-                query += 'doing=2&';
-            } else if (args[0] == 'login') {
-                if (args[1] == 'help') return msg.channel.send(`Example:\` ${M.prefix}gauntlet login <password> <time session in seconds: Optional>\``);
-                pass_session(msg.author.id, args[1], args[2] || 30);
-                console.log(keycard);
-                return msg.channel.send('Login session ready');
-            } else {
-                let helpgau = '__**HELP SECTIONS**__\n';
-                helpgau += 'use this command with gauntlet cmd\n`add,setup,login,<allcmd> help`';
-                helpgau += '\nExample: `' + M.prefix + 'gauntlet add help`';
-                return msg.channel.send(helpgau);
-            }
-
-            if (!keycard.has(msg.author.id)) return msg.channel.send('Your session login is end or not ready, please login with `' + `${M.prefix}gauntlet login <password>\``);
-            if (!gaurun) return;
-            req.get(`${M.host}/bot/api/gauntlets.php?${query}`, (err, res, body) => {
-                console.log(body);
-                if (body == '-1') return msg.channel.send("INFO: Setup is not ready, use this command for setup `" + `${M.prefix}gauntlet setup\``);
-                if (body == '-2') return msg.channel.send("INFO: You are not allowed to use it (Invalid)");
-                if (body == '-3') return msg.channel.send("INFO: Added success");
-                if (body == '-4') return msg.channel.send("INFO: Updated success");
-                if (body == '-5') return msg.channel.send("INFO: Not exists");
-                if (body == '-6') return msg.channel.send("INFO: Already exists");
-                if (body == '-7') return msg.channel.send("INFO: success change password");
-            });
-        } else if (commandDM == 'ping') return msg.channel.send('Pong!');
-    }
-});
-
-client.login(process.env.BOT_TOKEN || process.env.DISCORD_TOKEN);
+// Đăng nhập Bot
+const token = process.env.TOKEN || process.env.BOT_TOKEN;
+client.login(token);

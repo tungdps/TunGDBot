@@ -1,14 +1,17 @@
 const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
-    // Khai báo tên và mô tả lệnh Slash (Discord bắt buộc viết chữ thường, không khoảng trắng)
     data: new SlashCommandBuilder()
         .setName('ping')
-        .setDescription('Kiểm tra độ phản hồi của Bot TunGD'),
+        .setDescription('Check bot latency'),
 
-    // Hàm thực thi khi người dùng gõ /ping
     async execute(interaction) {
+        // Lấy ping websocket chuẩn từ client
         const ping = interaction.client.ws.ping;
-        await interaction.reply({ content: `🏓 Pong! Độ trễ hiện tại là **${ping}ms**` });
+        
+        // Trả lời lệnh Slash
+        await interaction.reply({ 
+            content: `Pong! My ping is **${ping}ms**` 
+        });
     },
 };

@@ -1,14 +1,12 @@
-const M = require ("../setup.json");
+const { SlashCommandBuilder } = require('discord.js');
 
-module.exports.run = async (client, msg, args) => {
-	
-	let owo = msg.author.id == M.owner;
-	if (!owo) return;
-	msg.reply (`Good Bye :)`).then(m => {
-        client.destroy();
-      });
-  }
+module.exports = {
+    data: new SlashCommandBuilder()
+        .setName('shut')
+        .setDescription('Shutdown the bot (Admin only)'),
 
-module.exports.help = {
-	name: "shut"
-	}
+    async execute(interaction) {
+        await interaction.reply({ content: '🛑 Shutting down TunGDBot...' });
+        process.exit(1);
+    }
+};

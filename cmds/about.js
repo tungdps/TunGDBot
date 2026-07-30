@@ -22,7 +22,7 @@ module.exports = {
 
             const embed = new EmbedBuilder()
                 .setTitle('About this bot')
-                .setDescription('```' + about + '```\n**Version**: ' + packageJson.version + ' | **Made by**: [Tunkoloithoat](https://github.com/tungdps/TunGDBot/tree/master')
+                .setDescription('```' + about + '```\n**Version**: ' + packageJson.version + ' | **Made by**: [Tunkoloithoat](https://github.com/tungdps/TunGDBot/tree/master)')
                 .setColor('#0099ff');
 
             await interaction.editReply({ embeds: [embed] });

@@ -43,7 +43,7 @@ module.exports.run = async (client, msg, args) => {
                 { name: "Tên Bài Hát", value: String(body.name || "Unknown"), inline: true },
                 { name: "Tác Giả", value: String(body.author || "Unknown"), inline: true }
             )
-            .setFooter({ text: "Sao chép ID trên và dán vào Geometry Dash!" });
+            .setFooter({ text: "Sao chép ID trên và dán vào Tun GDPS!" });
 
         return msg.channel.send({ embeds: [embed] });
 

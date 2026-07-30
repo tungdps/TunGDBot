@@ -4,7 +4,17 @@ const M = require("./setup.json");
 const app = require("express")();
 const status = M.statusbot;
 const action = M.actionbot;
-const { Client, GatewayIntentBits, Partials, Collection, ChannelType, ActivityType, REST, Routes, SlashCommandBuilder } = require("discord.js");
+const { 
+    Client, 
+    GatewayIntentBits, 
+    Partials, 
+    Collection, 
+    ChannelType, 
+    ActivityType, 
+    REST, 
+    Routes, 
+    SlashCommandBuilder 
+} = require("discord.js");
 const fs = require("fs");
 const req = require("request");
 
@@ -42,13 +52,16 @@ app.get("/", (req, res) => {
     res.end();
 });
 
+// Tải các lệnh từ thư mục ./cmds/
 fs.readdir("./cmds/", (err, files) => {
     if (err) return console.error(err);
     let jsfiles = files.filter(f => f.split(".").pop() === typefiles);
     if (jsfiles.length <= 0) return;
-    jsfiles.forEach((f, i) => {
+    jsfiles.forEach((f) => {
         let props = require(`./cmds/${f}`);
-        client.commands.set(props.help.name, props);
+        if (props.help && props.help.name) {
+            client.commands.set(props.help.name.toLowerCase(), props);
+        }
     });
 });
 
@@ -82,7 +95,7 @@ client.on("ready", async () => {
         }
     }
 
-    // --- ĐĂNG KÝ SLASH COMMANDS (/) VỚI DISCORD API ---
+    // --- ĐĂNG KÝ DANH SÁCH LỆNH SLASH COMMAND (/) VỚI DISCORD API ---
     const slashCommands = [
         new SlashCommandBuilder()
             .setName('level')
@@ -110,7 +123,11 @@ client.on("ready", async () => {
 
         new SlashCommandBuilder()
             .setName('songadd')
-            .setDescription('Thêm bài hát mới vào GDPS'),
+            .setDescription('Thêm bài hát mới vào GDPS')
+            .addStringOption(option =>
+                option.setName('url')
+                    .setDescription('Link bài hát .mp3')
+                    .setRequired(false)),
 
         new SlashCommandBuilder()
             .setName('ping')
@@ -121,18 +138,72 @@ client.on("ready", async () => {
         const token = process.env.BOT_TOKEN || process.env.DISCORD_TOKEN || M.token;
         if (token) {
             const rest = new REST({ version: '10' }).setToken(token);
-            console.log('Đang cập nhật danh sách lệnh Slash Command (/)....');
+            console.log('Đang đăng ký lệnh Slash Commands (/)...');
             await rest.put(
                 Routes.applicationCommands(client.user.id),
                 { body: slashCommands }
             );
-            console.log('✅ Đăng ký Slash Command thành công!');
+            console.log('✅ Đã đăng ký thành công Slash Commands (/)!');
         }
     } catch (error) {
         console.error('Lỗi khi đăng ký Slash Command:', error);
     }
 });
 
+// --- XỬ LÝ KHI NGƯỜI DÙNG DÙNG LỆNH GẠCH CHÉO (SLASH COMMANDS) ---
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+
+    // Phản hồi tạm thời ngay lập tức để không dính lỗi 3s Timeout của Discord
+    await interaction.deferReply();
+
+    const commandName = interaction.commandName.toLowerCase();
+    const cmd = client.commands.get(commandName);
+
+    if (!cmd) {
+        return interaction.editReply("❌ Lệnh này hiện không khả dụng!");
+    }
+
+    try {
+        let fakeArgs = [];
+
+        // Trích xuất tham số dựa theo lệnh
+        if (commandName === 'level') {
+            fakeArgs = [String(interaction.options.getInteger('id'))];
+        } else if (commandName === 'leaderboard') {
+            let type = interaction.options.getString('type') || 'stars';
+            let page = interaction.options.getInteger('page') || 1;
+            fakeArgs = [type, String(page)];
+        } else if (commandName === 'songadd') {
+            let url = interaction.options.getString('url') || '';
+            fakeArgs = [url];
+        }
+
+        // Tạo giả lập đối tượng Message tương thích với file trong ./cmds/
+        const fakeMsg = {
+            author: interaction.user,
+            attachments: new Collection(),
+            channel: {
+                send: async (content) => {
+                    if (typeof content === 'object') {
+                        return await interaction.editReply(content);
+                    } else {
+                        return await interaction.editReply({ content: content });
+                    }
+                }
+            }
+        };
+
+        // Chạy file command tương ứng
+        await cmd.run(client, fakeMsg, fakeArgs);
+
+    } catch (err) {
+        console.error("Lỗi khi chạy Slash Command:", err);
+        return interaction.editReply("❌ Có lỗi xảy ra khi thực hiện lệnh!");
+    }
+});
+
+// --- XỬ LÝ KHI NGƯỜI DÙNG DÙNG LỆNH PREFIX CŨ (0.level, 0.help,...) ---
 client.on('messageCreate', async msg => {
     if (msg.author.bot) return;
 
@@ -143,7 +214,7 @@ client.on('messageCreate', async msg => {
     if (!command.startsWith(M.prefix)) return;
 
     if (msg.channel.type === ChannelType.GuildText) {
-        let cmd = client.commands.get(command.slice(M.prefix.length));
+        let cmd = client.commands.get(command.slice(M.prefix.length).toLowerCase());
         if (cmd) cmd.run(client, msg, args);
     } else if (msg.channel.type === ChannelType.DM) {
         let commandDM = command.slice(M.prefix.length);

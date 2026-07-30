@@ -1,10 +1,10 @@
-			require("dotenv/config");
+require("dotenv/config");
 const bot = require("./bot");
 const M = require("./setup.json");
 const app = require("express")();
 const status = M.statusbot;
 const action = M.actionbot;
-const { Client, GatewayIntentBits, Partials, Collection, ChannelType, ActivityType } = require("discord.js");
+const { Client, GatewayIntentBits, Partials, Collection, ChannelType, ActivityType, REST, Routes, SlashCommandBuilder } = require("discord.js");
 const fs = require("fs");
 const req = require("request");
 
@@ -72,11 +72,64 @@ client.on("ready", async () => {
 
     if (process.env.GENERATE_INVITE_BOT == "true") {
         try {
-            let link = await client.generateInvite({ scopes: ['bot'], permissions: ["Administrator"] });
+            let link = await client.generateInvite({ 
+                scopes: ['bot', 'applications.commands'], 
+                permissions: ["Administrator"] 
+            });
             console.log("Invite me: " + link);
         } catch (err) {
             console.log(err.stack);
         }
+    }
+
+    // --- ĐĂNG KÝ SLASH COMMANDS (/) VỚI DISCORD API ---
+    const slashCommands = [
+        new SlashCommandBuilder()
+            .setName('level')
+            .setDescription('Tra cứu thông tin Level trên GDPS')
+            .addIntegerOption(option => 
+                option.setName('id')
+                    .setDescription('Nhập Level ID')
+                    .setRequired(true)),
+
+        new SlashCommandBuilder()
+            .setName('leaderboard')
+            .setDescription('Xem Bảng xếp hạng GDPS')
+            .addStringOption(option =>
+                option.setName('type')
+                    .setDescription('Loại xếp hạng (stars/demons)')
+                    .setRequired(false))
+            .addIntegerOption(option =>
+                option.setName('page')
+                    .setDescription('Số trang')
+                    .setRequired(false)),
+
+        new SlashCommandBuilder()
+            .setName('dailylevel')
+            .setDescription('Xem thông tin Daily Level hiện tại'),
+
+        new SlashCommandBuilder()
+            .setName('songadd')
+            .setDescription('Thêm bài hát mới vào GDPS'),
+
+        new SlashCommandBuilder()
+            .setName('ping')
+            .setDescription('Kiểm tra độ phản hồi của Bot')
+    ];
+
+    try {
+        const token = process.env.BOT_TOKEN || process.env.DISCORD_TOKEN || M.token;
+        if (token) {
+            const rest = new REST({ version: '10' }).setToken(token);
+            console.log('Đang cập nhật danh sách lệnh Slash Command (/)....');
+            await rest.put(
+                Routes.applicationCommands(client.user.id),
+                { body: slashCommands }
+            );
+            console.log('✅ Đăng ký Slash Command thành công!');
+        }
+    } catch (error) {
+        console.error('Lỗi khi đăng ký Slash Command:', error);
     }
 });
 

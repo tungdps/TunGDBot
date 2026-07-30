@@ -4,8 +4,8 @@
   "description": "This bot for gdps",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
-  },
+  "start": "node deploy-commands.js && node index.js"
+}
   "author": "FamryGd",
   "license": "MIT",
   "dependencies": {

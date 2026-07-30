@@ -1,19 +1,36 @@
-const Discord = require("discord.js");
-const fetch = require ("request-promise");
-const M = require ("../setup.json");
-const package = JSON.parse(require("fs").readFileSync("./package.json", "utf8"));
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const fetch = require('request-promise');
+const fs = require('fs');
 
-module.exports.run = async (client, msg, args) => {
-	let about = await fetch({
-		uri: `https://raw.githubusercontent.com/FamryAmri/Discord-Bot-GDPS/master/about`,
-		method: "GET"
-		});
-	let embed = new Discord.MessageEmbed();
-	embed.setTitle("About this bot");
-	embed.setDescription("```" + about + "```\n**Version**: " + package.version + " | **Made by**: [FamryAmri](http://github.com/FamryAmri/Discord-Bot-GDPS)");
-	msg.channel.send(embed);
-	}
-		
-module.exports.help = {
-	name: "about"
-	}
+// Đọc package.json để lấy phiên bản
+const packageJson = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+
+module.exports = {
+    data: new SlashCommandBuilder()
+        .setName('about')
+        .setDescription('Check information about this bot'),
+
+    async execute(interaction) {
+        // Tạm hoãn phản hồi để có thời gian fetch dữ liệu từ GitHub
+        await interaction.deferReply();
+
+        try {
+            const about = await fetch({
+                uri: 'https://raw.githubusercontent.com/FamryAmri/Discord-Bot-GDPS/master/about',
+                method: 'GET'
+            });
+
+            const embed = new EmbedBuilder()
+                .setTitle('About this bot')
+                .setDescription('```' + about + '```\n**Version**: ' + packageJson.version + ' | **Made by**: [FamryAmri](http://github.com/FamryAmri/Discord-Bot-GDPS)')
+                .setColor('#0099ff');
+
+            await interaction.editReply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Lỗi fetch thông tin about:', error);
+            await interaction.editReply({ 
+                content: '❌ Không thể tải thông tin giới thiệu từ GitHub!' 
+            });
+        }
+    },
+};
